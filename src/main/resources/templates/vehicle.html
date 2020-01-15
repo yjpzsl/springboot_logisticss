@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="utf-8">
+<title>学生页面</title>
+<link rel="stylesheet" href="../static/layui/css/layui.css"
+	th:href="@{/layui/css/layui.css}" media="all">
+</head>
+
+<body>
+	<!-- 页面结构 -->
+	<div>
+		<div class="layui-form-item">
+		  <div class="layui-inline">
+		    <label class="layui-form-label">日期范围</label>
+		    <div class="layui-input-inline" style="width: 100px;">
+		      <input type="text" id="search_beginDate" placeholder="开始日期" autocomplete="off" class="layui-input">
+		    </div>
+		    <div class="layui-form-mid">-</div>
+		    <div class="layui-input-inline" style="width: 100px;">
+		      <input type="text" id="search_endDate" placeholder="结束日期" autocomplete="off" class="layui-input">
+		    </div>
+		  </div>
+		  
+		  <div class="layui-inline">
+		    <label class="layui-form-label">车牌号</label>
+		    <div class="layui-input-inline" style="width: 100px;">
+		      <input type="text" id="search_name" autocomplete="off" class="layui-input">
+		    </div>
+		  </div>
+		  <div class="layui-inline">
+		      <button type="button" class="layui-btn" id="search_btn">搜索</button>
+		  </div>
+		</div>
+		<!-- 表格上方标题 -->
+		<blockquote class="layui-elem-quote">车辆管理</blockquote>
+		<!-- 添加按钮 -->
+		<a class="layui-btn layui-btn-sm" id="add-vehicle-btn">添加车辆</a>
+		<a class="layui-btn layui-btn-sm" id="deleteMore_btn">批量删除车辆</a>
+		<!-- 车辆表 -->
+		<table id="vehicle-tbl" lay-filter="vehicle-tbl"></table>
+		<script type="text/html" id="vehicle-tbl-toolbar">
+      		<a class="layui-btn layui-btn-xs" lay-event="updatevehicle">编辑</a>
+      		<a class="layui-btn layui-btn-xs layui-btn-danger" lay-event="deletevehicle">删除</a>
+    	</script>
+	</div>
+
+	<!-- 添加学生弹出层 -->
+	<div id="vehicle-layer" style="display: none; padding: 20px">
+		<form id="vehicle-form" class="layui-form layui-form-pane" lay-filter="vehicle-form">
+			<input type="hidden" name="vehicleId" class="layui-input" readonly>
+			<div class="layui-form-item">
+				<label class="layui-form-label">货车型号</label>
+				<div class="layui-input-block">
+					<input type="text" name="vehicleModel" class="layui-input"
+						lay-verify="required" autocomplete="off">
+				</div>
+			</div>
+			<div class="layui-form-item" pane>
+				<label class="layui-form-label">车牌号</label>
+				<div class="layui-input-block">
+					<input type="text" name="vehicleLicense" class="layui-input"
+						lay-verify="required" autocomplete="off">
+				</div>
+			</div>
+			<div class="layui-form-item">
+				<label class="layui-form-label">最大运载量</label>
+				<div class="layui-input-block">
+					<input type="text" name="vehicleWeight" class="layui-input"
+						lay-verify="required">
+				</div>
+			</div>
+			<div class="layui-form-item">
+				<div class="layui-input-block">
+					<button class="layui-btn" lay-submit
+						lay-filter="vehicle-form-submit">提交</button>
+					<button type="reset" class="layui-btn layui-btn-primary">重置</button>
+				</div>
+			</div>
+		</form>
+	</div>
+	<script src="layui/layui.js"></script>
+	<!-- 页面JS -->
+	<script>
+	
+		var title = "";
+		var url = "";
+		var $;
+		var layer;
+		layui.use([ 'jquery', 'table', 'layer', 'form', 'laydate' ],
+				function() {
+					// 加载layui模块，使用其推荐的【预先加载】方式，详见官网【模块规范】一节
+					$ = layui.$;
+					var table = layui.table;
+					layer = layui.layer;
+					var form = layui.form;
+					var laydate = layui.laydate;
+					laydate.render({
+						elem : '#vehicle' //或 elem: document.getElementById('test')、elem: lay('#test') 等
+					});
+					laydate.render({
+						elem : '#vehicle2' //或 elem: document.getElementById('test')、elem: lay('#test') 等
+					});
+					laydate.render({
+						elem : '#search_beginDate' //或 elem: document.getElementById('test')、elem: lay('#test') 等
+					});
+					laydate.render({
+						elem : '#search_endDate' //或 elem: document.getElementById('test')、elem: lay('#test') 等
+					});
+					//记录选中的数据:做缓存使用,作为参数传递给后台
+			        var ids = new Array();
+			        //当前表格中的全部数据:在表格的checkbox全选的时候没有得到数据, 因此用全局存放变量
+			        var table_data=new Array();
+					// 显示所有学生
+					table.render({
+						elem : '#vehicle-tbl',
+						url : 'vehicle/queryByPage',
+						method : 'get',
+						page:true,
+						height: $(document).height() - $('#vehicle-tbl').offset().top - 20,
+						cols : [ [ {
+							type:'checkbox'
+						},{
+							field : 'vehicleModel',
+							title : '货车型号'
+						}, {
+							field : 'vehicleLicense',
+							title : '车牌号'
+						}, {
+							field : 'vehicleWeight',
+							title : '最大运载量'							
+						}, {
+							field : 'createTime',
+							title : '创建时间'							
+						}, {
+							toolbar : '#vehicle-tbl-toolbar',
+							title : '操作'
+						} ] ],
+						// 表格容器id，用于表格重载
+						id : 'vehicle-tbl',
+						done: function (res, curr, count) {
+							//数据表格加载完成时调用此函数
+			                //如果是异步请求数据方式，res即为你接口返回的信息。
+			                //如果是直接赋值的方式，res即为：{data: [], count: 99} data为当前页数据、count为数据总长度
+			                if (res.count == 0) {//没有查询到数据隐藏分页栏
+			                    $(".layui-none").hide();//隐藏无数据
+			                    $(".layui-table-page").hide();//隐藏分页
+			                }else{
+			                	//设置全部数据到全局变量
+			                    table_data=res.data;
+			 
+			                    //在缓存中找到id ,然后设置data表格中的选中状态
+			                    //循环所有数据，找出对应关系，设置checkbox选中状态
+			                    for(var i=0;i< res.data.length;i++){
+			                        for (var j = 0; j < ids.length; j++) {
+			                            //数据id和要勾选的id相同时checkbox选中
+			                            if(res.data[i].id == ids[j]){
+			                                //这里才是真正的有效勾选
+			                                res.data[i]["LAY_CHECKED"]='true';
+			                                //找到对应数据改变勾选样式，呈现出选中效果
+			                                var index= res.data[i]['LAY_TABLE_INDEX'];
+			                                $('.layui-table tr[data-index=' + index + '] input[type="checkbox"]').prop('checked', true);
+			                                $('.layui-table tr[data-index=' + index + '] input[type="checkbox"]').next().addClass('layui-form-checked');
+			                            }
+			                        }
+			                    }
+			                    //设置全选checkbox的选中状态，只有改变LAY_CHECKED的值， table.checkStatus才能抓取到选中的状态
+			                    var checkStatus = table.checkStatus('vehicle-tbl');
+			                    if(checkStatus.isAll){
+			                        $('.layui-table th[data-field="0"] input[type="checkbox"]').prop('checked', true);
+			                        $('.layui-table th[data-field="0"] input[type="checkbox"]').next().addClass('layui-form-checked');
+			                    }
+			                }
+						}
+					});
+					//复选框选中监听,将选中的id 设置到缓存数组,或者删除缓存数组
+			        table.on('checkbox(vehicle-tbl)', function (obj) {
+			           if(obj.checked){
+			              if(obj.type=='one'){//单个复选框
+			            	  if(!isExist(obj.data.id,ids)){
+			            		  ids.push(obj.data.id); 
+			            	  }
+			              }else{//全选复选框
+			                   for(var i=0;i<table_data.length;i++){
+			                	   if(!isExist(table_data[i].id,ids)){//数组中不存在，则添加
+			                		   ids.push(table_data[i].id);
+			                	   }
+			                   }
+			              }
+			           }else{
+			               if(obj.type=='one'){
+			                   for(var i=0;i<ids.length;i++){
+			                      if(ids[i]==obj.data.id){
+			                           ids.splice(i,1);
+			                      }
+			                  }
+			               }else{
+			                   for(var i=0;i<ids.length;i++){
+			                       for(var j=0;j<table_data.length;j++){
+			                           if(ids[i]==table_data[j].id){
+			                        	   ids.splice(i,1);
+			                        	   i--;//删除的时候数组长度也在动态变化
+			                        	   break;
+			                          }
+			                       }
+			                   }
+			               }
+			           }
+			        });
+					// 显示添加学生弹出层
+					$('#add-vehicle-btn').click(function() {
+						// 每次显示前重置表单
+						$('#vehicle-form')[0].reset();
+						//清空表单中id值
+						$("input[name='id']").val('');
+						title = "添加学生";
+						url = "add";
+						
+						//打开对话框
+						openDialog();
+					});
+					$("#deleteMore_btn").click(function(){
+					    if(ids.length > 0) {
+					         layer.confirm("确定删除选中的"+ids.length+"条数据吗？", {icon: 3, title: '提示信息'}, function (index) {
+					        	 
+					        	 $.ajax({
+										url : "vehicle/deleteMore",
+										type : "POST",
+										data : "ids="+ids.join(),
+										dataType : 'json',
+										success : function(data) {
+											if (data.statue == 0) {
+												layer.close(index);
+												layer.msg(data.msg);
+												table.reload('vehicle-tbl');
+											} else {
+												layer.msg('删除失败');
+											}
+										}
+					        	 });
+					 
+					         })
+					     }else{
+					         layer.msg("请选择需要删除的记录");
+					     }
+					 });
+					/* 
+					//批量删除
+					$("#deleteMore_btn").click(function(){
+					     var checkStatus = table.checkStatus('vehicle-tbl'),
+				         data = checkStatus.data,
+				         ids = [];
+					     if(data.length > 0) {
+					         layer.confirm("确定删除选中的"+data.length+"条数据吗？", {icon: 3, title: '提示信息'}, function (index) {
+					        	 for (var i in data) {
+						        	 ids.push(data[i].id);
+						         }
+					        	 $.ajax({
+										url : "vehicle/deleteMore",
+										type : "POST",
+										data : "ids="+ids.join(),
+										dataType : 'json',
+										success : function(data) {
+											if (data.statue == 0) {
+												layer.close(index);
+												layer.msg(data.msg);
+												table.reload('vehicle-tbl');
+											} else {
+												layer.msg('删除失败');
+											}
+										}
+					        	 });
+					 
+					         })
+					     }else{
+					         layer.msg("请选择需要删除的记录");
+					     }
+					 });
+					 */
+					// 添加学生表单提交
+					form.on('submit(vehicle-form-submit)',
+							function(data) {
+								// ajax方式添加学生
+								$.ajax({
+									url : "vehicle/" + url,
+									type : "POST",
+									data : data.field,
+									// contentType: 'application/json',
+									dataType : 'json',
+									success : function(data) {
+										if (data.statue == 0) {
+											layer.close(layer.index);
+											layer.msg(data.msg);
+											table.reload('vehicle-tbl');
+										} else {
+											layer.msg('添加失败');
+										}
+									},
+									error : function() {
+										console.log("ajax error");
+									}
+								});
+								// 阻止表单跳转
+								return false;
+							});
+
+					// 监听行工具栏事件：删除学生与更新学生
+					table.on('tool(vehicle-tbl)', function(obj) {
+						// 获取当前行数据和lay-event的值
+						var data = obj.data;
+						var event = obj.event;
+
+						// 删除学生事件
+						if (event === 'deletevehicle') {
+							layer.confirm('确定删除该车辆吗？', function(index) {
+								// ajax方式删除学生
+								$.ajax({
+									url : 'vehicle/deleteMore',
+									type : "post",
+									data : 'ids=' + data.id,
+									dataType : 'json',
+									success : function(data) {
+										if (data.statue == 0) {
+											layer.msg(data.msg);
+											table.reload('vehicle-tbl');
+										} else {
+											layer.msg('删除失败');
+										}
+									},
+									error : function() {
+										console.log("ajax error");
+									}
+								});
+								layer.close(index);
+							});
+						}
+
+						// 更新学生事件
+						if (event === 'updatevehicle') {
+							//获取数据填充专业下拉框值
+							$.ajax({
+								url:"vehicle/queryAll",
+								type:"get",
+								dataType:"json",
+								success:function(result){
+									$("#majorId").empty().append(new Option('请选择专业', ''));
+									$.each(result,function(index,item){
+										$("#majorId").append(new Option(item.name, item.id));
+										$("#majorId").val(data.majorId);
+									});
+									layui.form.render("select");
+								}
+							});
+							// 每次显示更新学生的表单前自动为表单填写该行的数据
+							form.val('vehicle-form', {
+								"vehicleId" : data.id,
+								"vehicleModel" : data.name,
+								"vehicleLicense" : data.sex,
+								"vehicleWeight" : data.phone,
+								"address" : data.address,
+								"listenDate" : data.listenDate
+							});
+							title = "更新学生";
+							url = "update";
+							openDialog();
+						}
+					});
+					
+					$("#search_btn").click(function(){
+						table.reload('vehicle-tbl', {
+							  url: "vehicle/queryByPage"
+							  ,where: {
+								  beginDate:$('#search_beginDate').val(),
+								  endDate:$('#search_endDate').val(),
+								  name:$('#search_name').val()
+							  }
+							  ,page: {
+							    curr: 1
+							  }
+							});
+					});
+				});
+		function openDialog() {
+			// 显示更新学生表单的弹出层
+			layer.open({
+				type : 1,
+				title : title,
+				skin : 'layui-layer-molv',
+				area : [ '500px' ],
+				content : $('#vehicle-layer')
+			});
+		}
+		//判断数组中是否包含指定的元素
+		function isExist(value,array){
+			var flag = false;
+			for(var i=0;i<array.length;i++){
+				if(array[i]==value){
+					flag = true;
+					break;
+				}
+			}
+			return flag;
+		}
+	</script>
+</body>
+
+</html>
